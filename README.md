@@ -44,7 +44,7 @@ When an audio file contains a significant amount of noise but remains usable, th
 
 The current preprocessing pipeline applies a high-pass filter to reduce unwanted low-frequency components.
 
-```text
+
 Uploaded Audio
       |
       v
@@ -58,7 +58,6 @@ Normalized Audio
       |
       v
 Feature Extraction
-```
 
 The purpose of this process is to improve the input signal sufficiently for subsequent analysis.
 
@@ -80,7 +79,6 @@ The system converts audio signals into numerical representations suitable for ma
 
 The current implementation extracts **20 MFCC coefficients** and additional spectral and rhythmic features.
 
-```text
 Audio Signal
      |
      v
@@ -96,7 +94,6 @@ Feature Extraction
      |
      v
 Numerical Feature Vector
-```
 
 ---
 
@@ -121,16 +118,15 @@ The model produces a probability distribution across the known genres.
 
 Example:
 
-```text
+
 Rock       67%
 Metal      21%
 Blues       7%
 Jazz        5%
-```
 
 The highest-probability genre is presented as the primary genre prediction.
 
----
+
 
 ## 5. Genre Probability Analysis
 
@@ -140,13 +136,12 @@ This provides additional information about the model's decision.
 
 Example:
 
-```text
+
 Rock       67.20%
 Metal      20.85%
 Blues       6.91%
 Jazz        3.14%
-...
-```
+
 
 The probability map allows users to observe whether the model strongly favors one genre or produces a more distributed prediction.
 
@@ -160,25 +155,25 @@ Therefore, the system does not display only the highest-probability genre. It al
 
 For example:
 
-```text
+
 Primary Genre: Rock       46%
 Secondary:     Metal      43%
-```
+
 
 The system can interpret a small difference between the highest and second-highest probabilities as an indication of possible cross-genre characteristics.
 
 Example:
 
-```text
+
 Rock  — 46%
 Metal — 43%
 
 Possible Rock-Metal Cross-Genre Track
-```
+
 
 This provides a more informative result than a strict single-label classification.
 
----
+
 
 ## 7. Prediction Reliability
 
@@ -186,34 +181,33 @@ The application categorizes predictions based on the probability of the highest-
 
 ### High Confidence
 
-```text
+
 Rock — 78%
 
 Reliability: HIGH
-```
 
 ### Mixed or Uncertain
 
-```text
+
 Rock  — 46%
 Metal — 43%
 
 Reliability: MIXED / UNCERTAIN
-```
+
 
 ### No Strong Match
 
-```text
+
 Rock  — 23%
 Jazz  — 21%
 Blues — 19%
 
 No strong genre match
-```
+
 
 This approach helps communicate model uncertainty instead of presenting every prediction as equally reliable.
 
----
+
 
 ## 8. Audio DNA Profile
 
@@ -231,17 +225,16 @@ These characteristics are also visualized using a chart to provide a compact rep
 
 Example:
 
-```text
+
 Audio DNA
 
 Tempo              : 124 BPM
 Spectral Energy    : 0.08
 Zero Crossing Rate : 0.09
-```
 
 The Audio DNA provides additional information beyond the predicted genre.
 
----
+
 
 ## 9. Explainable AI
 
@@ -256,14 +249,14 @@ The application calculates their relative contribution to the Random Forest feat
 
 Example:
 
-```text
+
 MFCC Characteristics       : 68.40%
 Other Acoustic Features    : 31.60%
-```
+
 
 This provides a basic explanation of which feature groups influenced the classification.
 
----
+
 
 ## 10. Smart Playlist Categorization
 
@@ -271,20 +264,18 @@ Based on the analysis, the application determines a playlist category.
 
 Examples include:
 
-```text
+
 Rock Playlist
 Jazz Playlist
 Cross-Genre Discovery
 Unknown / Experimental
-```
+
 
 Songs exhibiting similar characteristics can therefore be conceptually organized according to their classification and cross-genre characteristics.
 
----
+#Complete System Workflow
 
-# Complete System Workflow
 
-```text
                     AUDIO UPLOAD
                          |
                          v
@@ -330,21 +321,20 @@ Songs exhibiting similar characteristics can therefore be conceptually organized
                               |
                               v
                     PLAYLIST CATEGORIZATION
-```
 
----
+
+
 
 # What Makes the System Different?
 
 A conventional genre classification system generally follows:
 
-```text
+
 Audio → Genre
-```
 
 This project follows a broader intelligence pipeline:
 
-```text
+
 Audio
   ↓
 Quality Assessment
@@ -370,11 +360,11 @@ Audio DNA
 Explainable Prediction
   ↓
 Playlist Categorization
-```
+
 
 The main objective is therefore not simply to predict a genre, but to provide a more informative analysis of the uploaded music.
 
----
+
 
 # Problem Statement
 
@@ -392,7 +382,7 @@ This project addresses these challenges by combining:
 
 **Audio Quality Analysis + Noise-Aware Processing + Acoustic Feature Extraction + Machine Learning Classification + Cross-Genre Analysis + Reliability Estimation + Audio Profiling + Explainable AI**
 
----
+
 
 # Dataset
 
@@ -415,7 +405,7 @@ The dataset contains ten music genres:
 
 The dataset should be organized as:
 
-```text
+
 dataset/
 └── genres_original/
     ├── blues/
@@ -428,17 +418,16 @@ dataset/
     ├── pop/
     ├── reggae/
     └── rock/
-```
 
 The dataset is used only during the model-training stage.
 
----
+
 
 # Machine Learning Pipeline
 
 The training process consists of the following stages:
 
-```text
+
 GTZAN Dataset
       ↓
 Audio Loading
@@ -456,7 +445,7 @@ Model Evaluation
 Trained Model
       ↓
 genre_model.pkl
-```
+
 
 The dataset is divided into training and testing subsets using a stratified train-test split.
 
@@ -487,7 +476,7 @@ The current Random Forest configuration uses:
 
 # Project Structure
 
-```text
+
 AI-Music-Intelligence/
 │
 ├── dataset/
@@ -510,7 +499,7 @@ AI-Music-Intelligence/
 ├── app.py
 ├── requirements.txt
 └── README.md
-```
+
 
 The `genre_model.pkl` file is generated automatically after executing the training script.
 
@@ -520,13 +509,13 @@ The `genre_model.pkl` file is generated automatically after executing the traini
 
 Clone the repository and install the required Python packages.
 
-```bash
+
 pip install -r requirements.txt
-```
+
 
 The required dependencies are:
 
-```text
+
 streamlit
 numpy
 librosa
@@ -534,7 +523,7 @@ joblib
 scikit-learn
 scipy
 matplotlib
-```
+
 
 ---
 
@@ -542,15 +531,15 @@ matplotlib
 
 Place the GTZAN dataset in:
 
-```text
+
 dataset/genres_original/
-```
+
 
 Then execute:
 
-```bash
+
 python train.py
-```
+
 
 The training script will:
 
@@ -563,9 +552,9 @@ The training script will:
 
 The resulting model will be saved as:
 
-```text
+
 models/genre_model.pkl
-```
+
 
 ---
 
@@ -573,9 +562,9 @@ models/genre_model.pkl
 
 After the model has been generated, start the Streamlit application:
 
-```bash
+
 streamlit run app.py
-```
+
 
 The application allows the user to:
 
