@@ -1,0 +1,843 @@
+import streamlit as st
+import numpy as np
+import librosa
+import joblib
+import tempfile
+import os
+
+from scipy.signal import butter, sosfilt
+import matplotlib.pyplot as plt
+
+
+# ==================================================
+# PAGE CONFIGURATION
+# ==================================================
+
+st.set_page_config(
+    page_title="AI Music Intelligence",
+    page_icon="🎵",
+    layout="wide"
+)
+
+
+# ==================================================
+# LOAD MODEL
+# ==================================================
+
+MODEL_PATH = "models/genre_model.pkl"
+
+model = joblib.load(MODEL_PATH)
+
+
+# ==================================================
+# FEATURE EXTRACTION
+# ==================================================
+
+def extract_features(y, sr):
+
+    # MFCC
+    mfcc = librosa.feature.mfcc(
+        y=y,
+        sr=sr,
+        n_mfcc=20
+    )
+
+    mfcc_features = np.mean(
+        mfcc,
+        axis=1
+    )
+
+    # Spectral Centroid
+    centroid = librosa.feature.spectral_centroid(
+        y=y,
+        sr=sr
+    )
+
+    centroid_mean = np.mean(centroid)
+
+    # Spectral Bandwidth
+    bandwidth = librosa.feature.spectral_bandwidth(
+        y=y,
+        sr=sr
+    )
+
+    bandwidth_mean = np.mean(bandwidth)
+
+    # Zero Crossing Rate
+    zcr = librosa.feature.zero_crossing_rate(y)
+
+    zcr_mean = np.mean(zcr)
+
+    # Spectral Rolloff
+    rolloff = librosa.feature.spectral_rolloff(
+        y=y,
+        sr=sr
+    )
+
+    rolloff_mean = np.mean(rolloff)
+
+    # Tempo
+    tempo, _ = librosa.beat.beat_track(
+        y=y,
+        sr=sr
+    )
+
+    tempo_value = float(
+        np.asarray(tempo).flatten()[0]
+    )
+
+    # RMS
+    rms = librosa.feature.rms(y=y)
+
+    rms_mean = np.mean(rms)
+
+    features = np.concatenate([
+        mfcc_features,
+        [centroid_mean],
+        [bandwidth_mean],
+        [zcr_mean],
+        [rolloff_mean],
+        [tempo_value],
+        [rms_mean]
+    ])
+
+    return features
+
+
+# ==================================================
+# AUDIO QUALITY ANALYSIS
+# ==================================================
+
+def calculate_audio_quality(y):
+
+    # RMS energy
+    rms = np.sqrt(
+        np.mean(y ** 2)
+    )
+
+    # Clipping percentage
+    clipping = np.mean(
+        np.abs(y) > 0.99
+    )
+
+    # Dynamic range
+    dynamic_range = np.max(y) - np.min(y)
+
+    # Estimate noise from low-energy samples
+    threshold = np.percentile(
+        np.abs(y),
+        20
+    )
+
+    noise_samples = y[
+        np.abs(y) <= threshold
+    ]
+
+    if len(noise_samples) > 0:
+
+        noise_level = np.std(
+            noise_samples
+        )
+
+    else:
+
+        noise_level = 0
+
+    # ------------------------------------------
+    # Quality score
+    # ------------------------------------------
+
+    score = 100
+
+    # Too quiet
+    if rms < 0.01:
+
+        score -= 40
+
+    elif rms < 0.03:
+
+        score -= 20
+
+    # Clipping
+    if clipping > 0.01:
+
+        score -= 25
+
+    elif clipping > 0.001:
+
+        score -= 10
+
+    # Low dynamic range
+    if dynamic_range < 0.2:
+
+        score -= 15
+
+    # Noise
+    if noise_level > 0.05:
+
+        score -= 20
+
+    elif noise_level > 0.02:
+
+        score -= 10
+
+    score = max(
+        0,
+        min(100, score)
+    )
+
+    return score, noise_level
+
+
+# ==================================================
+# SIMPLE NOISE REDUCTION
+# ==================================================
+
+def reduce_noise(y, sr):
+
+    # High-pass filter
+    # Removes very low-frequency unwanted noise
+
+    sos = butter(
+        6,
+        60,
+        btype="highpass",
+        fs=sr,
+        output="sos"
+    )
+
+    cleaned = sosfilt(
+        sos,
+        y
+    )
+
+    # Normalize
+    max_value = np.max(
+        np.abs(cleaned)
+    )
+
+    if max_value > 0:
+
+        cleaned = cleaned / max_value
+
+    return cleaned
+
+
+# ==================================================
+# AUDIO DNA
+# ==================================================
+
+def calculate_audio_dna(y, sr):
+
+    tempo, _ = librosa.beat.beat_track(
+        y=y,
+        sr=sr
+    )
+
+    tempo = float(
+        np.asarray(tempo).flatten()[0]
+    )
+
+    centroid = np.mean(
+        librosa.feature.spectral_centroid(
+            y=y,
+            sr=sr
+        )
+    )
+
+    bandwidth = np.mean(
+        librosa.feature.spectral_bandwidth(
+            y=y,
+            sr=sr
+        )
+    )
+
+    rms = np.mean(
+        librosa.feature.rms(y=y)
+    )
+
+    zcr = np.mean(
+        librosa.feature.zero_crossing_rate(y)
+    )
+
+    return {
+        "Tempo": tempo,
+        "Spectral Centroid": centroid,
+        "Spectral Bandwidth": bandwidth,
+        "Energy": rms,
+        "Rhythm / ZCR": zcr
+    }
+
+
+# ==================================================
+# EXPLAINABLE AI
+# ==================================================
+
+def explain_prediction(model, features):
+
+    importances = model.feature_importances_
+
+    # MFCC importance
+    mfcc_importance = np.sum(
+        importances[:20]
+    )
+
+    # Other feature importance
+    acoustic_importance = np.sum(
+        importances[20:]
+    )
+
+    total = (
+        mfcc_importance +
+        acoustic_importance
+    )
+
+    if total == 0:
+
+        return 50, 50
+
+    mfcc_percentage = (
+        mfcc_importance /
+        total
+    ) * 100
+
+    acoustic_percentage = (
+        acoustic_importance /
+        total
+    ) * 100
+
+    return (
+        mfcc_percentage,
+        acoustic_percentage
+    )
+
+
+# ==================================================
+# GENRE ANALYSIS
+# ==================================================
+
+def analyze_genre(features):
+
+    probabilities = model.predict_proba(
+        [features]
+    )[0]
+
+    genres = model.classes_
+
+    sorted_indices = np.argsort(
+        probabilities
+    )[::-1]
+
+    results = []
+
+    for index in sorted_indices:
+
+        results.append({
+            "genre": genres[index],
+            "probability": probabilities[index]
+        })
+
+    return results
+
+
+# ==================================================
+# MAIN UI
+# ==================================================
+
+st.title("🎵 AI Music Intelligence System")
+
+st.markdown(
+    """
+### 🎧 Intelligent Audio Analysis + Genre Detection + Smart Playlist
+
+Upload a song and the AI will analyze its quality, genre,
+cross-genre characteristics, reliability and audio DNA.
+"""
+)
+
+
+# ==================================================
+# FILE UPLOAD
+# ==================================================
+
+uploaded_file = st.file_uploader(
+    "🎵 Upload an audio file",
+    type=[
+        "wav",
+        "mp3",
+        "ogg",
+        "flac"
+    ]
+)
+
+
+if uploaded_file is not None:
+
+    st.audio(
+        uploaded_file
+    )
+
+    # Save temporary file
+    suffix = os.path.splitext(
+        uploaded_file.name
+    )[1]
+
+    with tempfile.NamedTemporaryFile(
+        delete=False,
+        suffix=suffix
+    ) as temp:
+
+        temp.write(
+            uploaded_file.read()
+        )
+
+        temp_path = temp.name
+
+
+    # Load audio
+    y, sr = librosa.load(
+        temp_path,
+        sr=22050,
+        mono=True,
+        duration=30
+    )
+
+
+    # ==================================================
+    # AUDIO QUALITY
+    # ==================================================
+
+    st.header("🎧 1. Audio Quality Analysis")
+
+    quality_score, noise_level = calculate_audio_quality(
+        y
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        st.metric(
+            "Audio Quality",
+            f"{quality_score}/100"
+        )
+
+    with col2:
+
+        st.metric(
+            "Noise Level",
+            f"{noise_level:.4f}"
+        )
+
+    with col3:
+
+        if quality_score >= 70:
+
+            st.success("Suitable")
+
+        elif quality_score >= 45:
+
+            st.warning("Needs attention")
+
+        else:
+
+            st.error("Too low")
+
+
+    # ==================================================
+    # QUALITY DECISION
+    # ==================================================
+
+    if quality_score < 45:
+
+        st.error(
+            """
+            ❌ Audio quality is too low for reliable genre classification.
+
+            Please upload a clearer audio file.
+            """
+        )
+
+        st.stop()
+
+
+    elif quality_score < 70:
+
+        st.warning(
+            """
+            ⚠️ High background noise or reduced audio quality detected.
+
+            This may affect genre prediction.
+            """
+        )
+
+        clean_audio = st.button(
+            "🧹 Clean & Continue"
+        )
+
+        if clean_audio:
+
+            y = reduce_noise(
+                y,
+                sr
+            )
+
+            st.success(
+                "Audio preprocessing completed."
+            )
+
+        else:
+
+            st.info(
+                "You can continue with the original audio."
+            )
+
+
+    else:
+
+        st.success(
+            """
+            ✅ Audio quality is good.
+            Suitable for genre analysis.
+            """
+        )
+
+
+    # ==================================================
+    # FEATURE EXTRACTION
+    # ==================================================
+
+    st.header(
+        "🎼 2. Feature Extraction"
+    )
+
+    features = extract_features(
+        y,
+        sr
+    )
+
+    st.success(
+        "MFCC + acoustic features extracted successfully."
+    )
+
+
+    # ==================================================
+    # GENRE PREDICTION
+    # ==================================================
+
+    st.header(
+        "🤖 3. Genre Intelligence"
+    )
+
+    results = analyze_genre(
+        features
+    )
+
+
+    primary = results[0]
+
+    primary_genre = primary["genre"]
+
+    primary_probability = (
+        primary["probability"] * 100
+    )
+
+
+    # ==================================================
+    # PRIMARY GENRE
+    # ==================================================
+
+    st.subheader(
+        "🎼 Primary Genre"
+    )
+
+    if primary_probability >= 60:
+
+        st.success(
+            f"""
+            🎸 **{primary_genre.upper()}**
+
+            Confidence: **{primary_probability:.2f}%**
+
+            Reliability: **HIGH**
+            """
+        )
+
+    elif primary_probability >= 40:
+
+        st.warning(
+            f"""
+            ⚠️ **{primary_genre.upper()}**
+
+            Confidence: **{primary_probability:.2f}%**
+
+            Reliability: **MIXED / UNCERTAIN**
+            """
+        )
+
+    else:
+
+        st.error(
+            f"""
+            ❓ No strong genre match.
+
+            Highest prediction:
+            **{primary_genre} — {primary_probability:.2f}%**
+            """
+        )
+
+
+    # ==================================================
+    # PROBABILITY MAP
+    # ==================================================
+
+    st.subheader(
+        "📊 Genre Probability Map"
+    )
+
+    for item in results:
+
+        genre = item["genre"]
+
+        probability = (
+            item["probability"] * 100
+        )
+
+        st.write(
+            f"**{genre.title()}** — "
+            f"{probability:.2f}%"
+        )
+
+        st.progress(
+            float(
+                item["probability"]
+            )
+        )
+
+
+    # ==================================================
+    # CROSS GENRE
+    # ==================================================
+
+    st.header(
+        "🔀 4. Cross-Genre Analysis"
+    )
+
+    second = results[1]
+    third = results[2]
+
+    second_probability = (
+        second["probability"] * 100
+    )
+
+    third_probability = (
+        third["probability"] * 100
+    )
+
+
+    st.write(
+        f"""
+        **Primary:** {primary_genre.title()}
+        — {primary_probability:.2f}%
+
+        **Cross-Genre 1:** {second["genre"].title()}
+        — {second_probability:.2f}%
+
+        **Cross-Genre 2:** {third["genre"].title()}
+        — {third_probability:.2f}%
+        """
+    )
+
+
+    # Similarity threshold
+    difference = (
+        primary_probability -
+        second_probability
+    )
+
+
+    if difference <= 10:
+
+        st.warning(
+            f"""
+            🔀 **Possible {primary_genre.title()}–{second["genre"].title()}
+            Cross-Genre Track**
+
+            The top two genres have similar probabilities.
+            """
+        )
+
+        playlist_type = "Cross-Genre Discovery"
+
+
+    elif primary_probability < 40:
+
+        st.error(
+            """
+            ❓ **Unknown / Mixed Track**
+
+            No known GTZAN genre has a sufficiently strong match.
+            """
+        )
+
+        playlist_type = "Unknown / Experimental"
+
+
+    else:
+
+        st.success(
+            f"""
+            🎵 Strong {primary_genre.title()} characteristics detected.
+            """
+        )
+
+        playlist_type = (
+            primary_genre.title() +
+            " Playlist"
+        )
+
+
+    # ==================================================
+    # AUDIO DNA
+    # ==================================================
+
+    st.header(
+        "🧬 5. Audio DNA"
+    )
+
+    dna = calculate_audio_dna(
+        y,
+        sr
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        st.metric(
+            "Tempo",
+            f"{dna['Tempo']:.1f} BPM"
+        )
+
+    with col2:
+
+        st.metric(
+            "Spectral Energy",
+            f"{dna['Energy']:.4f}"
+        )
+
+    with col3:
+
+        st.metric(
+            "Zero Crossing",
+            f"{dna['Rhythm / ZCR']:.4f}"
+        )
+
+
+    # ==================================================
+    # AUDIO DNA CHART
+    # ==================================================
+
+    values = [
+        dna["Tempo"],
+        dna["Spectral Centroid"],
+        dna["Spectral Bandwidth"],
+        dna["Energy"],
+        dna["Rhythm / ZCR"]
+    ]
+
+    labels = [
+        "Tempo",
+        "Centroid",
+        "Bandwidth",
+        "Energy",
+        "Rhythm"
+    ]
+
+    fig, ax = plt.subplots()
+
+    ax.bar(
+        labels,
+        values
+    )
+
+    ax.set_title(
+        "Audio DNA Profile"
+    )
+
+    ax.set_ylabel(
+        "Feature Value"
+    )
+
+    plt.xticks(
+        rotation=30
+    )
+
+    st.pyplot(fig)
+
+
+    # ==================================================
+    # EXPLAINABLE AI
+    # ==================================================
+
+    st.header(
+        "🔍 6. Why This Genre?"
+    )
+
+    mfcc_percentage, acoustic_percentage = explain_prediction(
+        model,
+        features
+    )
+
+    st.write(
+        f"""
+        The model's decision is mainly influenced by:
+
+        🎼 **MFCC characteristics:** 
+        {mfcc_percentage:.2f}%
+
+        🎚️ **Other acoustic characteristics:**
+        {acoustic_percentage:.2f}%
+        """
+    )
+
+    st.info(
+        f"""
+        🧠 **Explanation**
+
+        The model detected acoustic patterns that most closely
+        resemble **{primary_genre.title()}** in the GTZAN training data.
+        """
+    )
+
+
+    # ==================================================
+    # PLAYLIST
+    # ==================================================
+
+    st.header(
+        "🎶 7. Smart Playlist"
+    )
+
+    st.success(
+        f"""
+        This song will be organized into:
+
+        🎵 **{playlist_type}**
+        """
+    )
+
+
+    # ==================================================
+    # CLEAN TEMP FILE
+    # ==================================================
+
+    try:
+
+        os.remove(
+            temp_path
+        )
+
+    except:
+
+        pass
