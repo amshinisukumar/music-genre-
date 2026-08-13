@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 
 
-DATASET_PATH = "dataset/genres_original"
+DATASET_PATH = "dataset/genres"
 MODEL_PATH = "models/genre_model.pkl"
 
 
